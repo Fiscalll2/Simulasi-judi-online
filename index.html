@@ -99,13 +99,38 @@
         font-size: clamp(3.2rem, 8vw, 4.6rem);
         transition: transform 160ms ease, border 160ms ease, box-shadow 160ms ease;
         box-shadow: inset 0 0 25px rgba(0, 0, 0, 0.35);
+        position: relative;
+        overflow: hidden;
       }
 
-      .reel.spinning {
-        animation: reelSpin 0.5s linear infinite, reelGlow 1s ease-in-out infinite;
-        filter: blur(2px);
-        opacity: 0.9;
-        box-shadow: 0 0 30px rgba(0, 242, 255, 0.6), inset 0 0 25px rgba(0, 0, 0, 0.35);
+      .reel-content {
+        position: absolute;
+        width: 100%;
+        height: 300%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        transition: transform 0.1s linear;
+      }
+
+      .reel-symbol {
+        width: 100%;
+        height: 33.33%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: clamp(3.2rem, 8vw, 4.6rem);
+      }
+
+      .reel.spinning .reel-content {
+        animation: reelScroll 0.1s linear infinite;
+      }
+
+      .reel.revealing {
+        border-color: var(--accent-2);
+        box-shadow: 0 0 40px rgba(0, 242, 255, 0.8);
+        animation: reelPulse 0.5s ease-in-out;
       }
 
       .reel.win {
@@ -367,31 +392,44 @@
         transition: opacity 300ms ease;
       }
 
-      @keyframes reelSpin {
+      @keyframes reelScroll {
         0% {
-          transform: rotateX(0deg) rotateY(0deg);
-        }
-        25% {
-          transform: rotateX(25deg) rotateY(5deg);
-        }
-        50% {
-          transform: rotateX(35deg) rotateY(0deg);
-        }
-        75% {
-          transform: rotateX(25deg) rotateY(-5deg);
+          transform: translateY(0);
         }
         100% {
-          transform: rotateX(0deg) rotateY(0deg);
+          transform: translateY(-66.66%);
         }
       }
 
-      @keyframes reelGlow {
+      @keyframes reelPulse {
         0%, 100% {
-          box-shadow: 0 0 30px rgba(0, 242, 255, 0.6), inset 0 0 25px rgba(0, 0, 0, 0.35);
+          transform: scale(1);
         }
         50% {
-          box-shadow: 0 0 50px rgba(0, 242, 255, 0.9), inset 0 0 25px rgba(0, 0, 0, 0.35);
+          transform: scale(1.05);
         }
+      }
+
+      .gambler-hint {
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(255, 193, 7, 0.15);
+        border: 1px solid rgba(255, 193, 7, 0.5);
+        padding: 12px 24px;
+        border-radius: 12px;
+        color: #ffc107;
+        font-weight: 600;
+        font-size: 0.95rem;
+        z-index: 25;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        pointer-events: none;
+      }
+
+      .gambler-hint.show {
+        opacity: 1;
       }
 
       @media (max-width: 720px) {
@@ -482,10 +520,29 @@
           <button id="reset-button" disabled>Reset Tantangan</button>
         </div>
         <div class="reels" id="reels">
-          <div class="reel">&#x1F48E;</div>
-          <div class="reel">&#x2B50;</div>
-          <div class="reel">&#x1F349;</div>
+          <div class="reel" data-reel="0">
+            <div class="reel-content">
+              <div class="reel-symbol">&#x1F48E;</div>
+              <div class="reel-symbol">&#x2B50;</div>
+              <div class="reel-symbol">&#x1F349;</div>
+            </div>
+          </div>
+          <div class="reel" data-reel="1">
+            <div class="reel-content">
+              <div class="reel-symbol">&#x1F48E;</div>
+              <div class="reel-symbol">&#x2B50;</div>
+              <div class="reel-symbol">&#x1F349;</div>
+            </div>
+          </div>
+          <div class="reel" data-reel="2">
+            <div class="reel-content">
+              <div class="reel-symbol">&#x1F48E;</div>
+              <div class="reel-symbol">&#x2B50;</div>
+              <div class="reel-symbol">&#x1F349;</div>
+            </div>
+          </div>
         </div>
+        <div class="gambler-hint" id="gambler-hint"></div>
         <div class="stats">
           <div class="stat-card">
             <div>
@@ -735,13 +792,86 @@
         return { label: "Spin Biasa", multiplier: 0, badge: "" };
       }
 
+      // Gambler's Fallacy system
+      let consecutiveLosses = 0;
+      let nearMissCount = 0;
+      const gamblerHints = [
+        "Hampir jackpot! Coba lagi!",
+        "Hampir menang! Next spin pasti gacor!",
+        "Jackpot meter hampir penuh!",
+        "Lucky streak incoming!",
+        "Hampir dapat triple! Spin lagi!",
+        "Hot streak detected!",
+        "Next spin = jackpot!",
+        "99% chance menang berikutnya!"
+      ];
+
+      function showGamblerHint(message) {
+        const hintEl = document.getElementById("gambler-hint");
+        if (hintEl) {
+          hintEl.textContent = message;
+          hintEl.classList.add("show");
+          setTimeout(() => hintEl.classList.remove("show"), 3000);
+        }
+      }
+
+      function checkNearMiss(result) {
+        const unique = new Set(result);
+        if (unique.size === 2) {
+          // Near miss - 2 simbol sama, hampir jackpot
+          nearMissCount++;
+          if (nearMissCount % 2 === 0) {
+            showGamblerHint(gamblerHints[cryptoRandomInt(gamblerHints.length)]);
+          }
+        }
+      }
+
+      function populateReelContent(reel, resultSymbol = null) {
+        const reelContent = reel.querySelector(".reel-content");
+        if (!reelContent) return;
+        
+        // Generate banyak symbols untuk scrolling effect yang smooth
+        const allSymbols = [];
+        const cycles = 15; // Banyak cycles untuk smooth scrolling
+        for (let i = 0; i < cycles; i++) {
+          allSymbols.push(...symbols);
+        }
+        
+        // Jika ada resultSymbol, pastikan dia ada di tengah (visible area)
+        if (resultSymbol) {
+          const symbolIndex = symbols.indexOf(resultSymbol);
+          const middleIndex = Math.floor(allSymbols.length / 2);
+          // Place result symbol di tengah dengan neighbors
+          allSymbols[middleIndex] = resultSymbol;
+          if (middleIndex > 0) {
+            allSymbols[middleIndex - 1] = symbols[(symbolIndex - 1 + symbols.length) % symbols.length];
+          }
+          if (middleIndex < allSymbols.length - 1) {
+            allSymbols[middleIndex + 1] = symbols[(symbolIndex + 1) % symbols.length];
+          }
+        }
+        
+        reelContent.innerHTML = "";
+        allSymbols.forEach((symbol) => {
+          const symbolDiv = document.createElement("div");
+          symbolDiv.className = "reel-symbol";
+          symbolDiv.textContent = symbol;
+          reelContent.appendChild(symbolDiv);
+        });
+        
+        // Reset transform untuk animasi baru
+        reelContent.style.transform = "translateY(0)";
+      }
+
       function startRolling() {
         reels.forEach((reel, index) => {
           reel.classList.add("spinning");
-          const interval = setInterval(() => {
-            reel.textContent = symbols[cryptoRandomInt(symbols.length)];
-          }, 80 + index * 20);
-          rollingIntervals[index] = interval;
+          const reelContent = reel.querySelector(".reel-content");
+          if (reelContent) {
+            // Populate dengan random symbols untuk animasi
+            const randomSymbol = symbols[cryptoRandomInt(symbols.length)];
+            populateReelContent(reel, randomSymbol);
+          }
         });
         playSpinSound();
       }
@@ -752,17 +882,81 @@
         reels.forEach((reel) => reel.classList.remove("spinning"));
       }
 
-      function updateReels(result, state) {
-        reels.forEach((reel, index) => {
-          reel.textContent = result[index];
-          reel.classList.remove("win", "warn");
-        });
-        requestAnimationFrame(() => {
-          if (state.badge === "jackpot") {
-            reels.forEach((reel) => reel.classList.add("win"));
-          } else if (state.badge === "mini") {
-            reels.forEach((reel) => reel.classList.add("warn"));
+      function revealReelSequentially(result, state, callback) {
+        let revealedCount = 0;
+        
+        function revealNext() {
+          if (revealedCount >= reels.length) {
+            if (callback) callback();
+            return;
           }
+          
+          const reel = reels[revealedCount];
+          const targetSymbol = result[revealedCount];
+          
+          // Stop spinning untuk reel ini
+          reel.classList.remove("spinning");
+          reel.classList.add("revealing");
+          
+          // Set final symbol dengan animasi
+          const reelContent = reel.querySelector(".reel-content");
+          if (reelContent) {
+            // Populate dengan target symbol di tengah
+            populateReelContent(reel, targetSymbol);
+            
+            // Calculate target position (middle symbol - 1/3 dari total height untuk center)
+            const totalSymbols = 15 * symbols.length; // Total symbols in reel
+            const symbolHeight = 100 / totalSymbols; // Percentage height per symbol
+            const middleIndex = Math.floor(totalSymbols / 2);
+            // Target: middle symbol minus 1/3 height untuk center di viewport
+            const targetY = -(middleIndex * symbolHeight) + (33.33 / 2);
+            
+            // Animate to final position dengan easing yang smooth
+            reelContent.style.transition = "transform 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94)";
+            setTimeout(() => {
+              reelContent.style.transform = `translateY(${targetY}%)`;
+            }, 50);
+          }
+          
+          // Play reveal sound dengan pitch berbeda untuk setiap reel
+          playTone(300 + revealedCount * 150, 0.25, "sine", 0.12);
+          
+          revealedCount++;
+          
+          // Reveal next reel setelah delay (suspense semakin besar!)
+          const delay = 900 + revealedCount * 250; // Delay semakin lama untuk suspense
+          setTimeout(revealNext, delay);
+        }
+        
+        revealNext();
+      }
+
+      function updateReels(result, state, callback) {
+        // Check for near miss (gambler's fallacy)
+        checkNearMiss(result);
+        
+        // Reveal satu per satu dengan suspense
+        revealReelSequentially(result, state, () => {
+          // Setelah semua reveal, apply win effects
+          requestAnimationFrame(() => {
+            reels.forEach((reel) => reel.classList.remove("revealing"));
+            if (state.badge === "jackpot") {
+              reels.forEach((reel) => reel.classList.add("win"));
+              consecutiveLosses = 0;
+            } else if (state.badge === "mini") {
+              reels.forEach((reel) => reel.classList.add("warn"));
+              consecutiveLosses = 0;
+            } else {
+              consecutiveLosses++;
+              // Show gambler hint setelah beberapa loss
+              if (consecutiveLosses >= 3) {
+                showGamblerHint("Sudah " + consecutiveLosses + "x loss, next spin pasti menang!");
+              }
+            }
+            
+            // Call callback setelah semua selesai
+            if (callback) callback();
+          });
         });
       }
 
@@ -969,34 +1163,38 @@
         setTimeout(() => {
           stopRolling();
           const comboScore = result.reduce((sum, symbol) => sum + rarityScore[symbol], 0);
-          let rewardText = "Hangus";
+          
+          // Update reels dengan reveal sequential (suspense!)
+          updateReels(result, state, () => {
+            // Callback setelah semua reel reveal
+            let rewardText = "Hangus";
 
-          if (state.label === "Mini Win") {
-            balance += spinCost;
-            totalWon += spinCost;
-            totalWins += 1;
-            rewardText = `Refund ${formatMoney(spinCost)}`;
-            playMiniSound();
-          } else if (state.label === "Jackpot") {
-            // Reward jackpot = total cost batch × multiplier
-            const reward = currentBatchCost * state.multiplier;
-            balance += reward;
-            totalWon += reward;
-            totalWins += 1;
-            rewardText = `Jackpot ${formatMoney(reward)}`;
-            playJackpotSound();
-          }
+            if (state.label === "Mini Win") {
+              balance += spinCost;
+              totalWon += spinCost;
+              totalWins += 1;
+              rewardText = `Refund ${formatMoney(spinCost)}`;
+              playMiniSound();
+            } else if (state.label === "Jackpot") {
+              // Reward jackpot = total cost batch × multiplier
+              const reward = currentBatchCost * state.multiplier;
+              balance += reward;
+              totalWon += reward;
+              totalWins += 1;
+              rewardText = `Jackpot ${formatMoney(reward)}`;
+              playJackpotSound();
+            }
 
-          updateBalanceDisplay();
-          updateReels(result, state);
-          pushHistory(result, state, rewardText);
-          registerOutcome(state, comboScore);
-          updateStatistics();
-          if (state.label === "Jackpot") launchConfetti();
+            updateBalanceDisplay();
+            pushHistory(result, state, rewardText);
+            registerOutcome(state, comboScore);
+            updateStatistics();
+            if (state.label === "Jackpot") launchConfetti();
 
-          queuedSpins -= 1;
-          setTimeout(processSpinQueue, 280);
-        }, 1100);
+            queuedSpins -= 1;
+            setTimeout(processSpinQueue, 500);
+          });
+        }, 1500); // Spin lebih lama untuk efek suspense
       }
 
       function requireSession() {
