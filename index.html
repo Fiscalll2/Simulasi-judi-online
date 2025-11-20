@@ -102,9 +102,10 @@
       }
 
       .reel.spinning {
-        animation: reelSpin 0.5s linear infinite;
+        animation: reelSpin 0.5s linear infinite, reelGlow 1s ease-in-out infinite;
         filter: blur(2px);
-        opacity: 0.8;
+        opacity: 0.9;
+        box-shadow: 0 0 30px rgba(0, 242, 255, 0.6), inset 0 0 25px rgba(0, 0, 0, 0.35);
       }
 
       .reel.win {
@@ -368,13 +369,28 @@
 
       @keyframes reelSpin {
         0% {
-          transform: rotateX(0deg);
+          transform: rotateX(0deg) rotateY(0deg);
+        }
+        25% {
+          transform: rotateX(25deg) rotateY(5deg);
         }
         50% {
-          transform: rotateX(35deg);
+          transform: rotateX(35deg) rotateY(0deg);
+        }
+        75% {
+          transform: rotateX(25deg) rotateY(-5deg);
         }
         100% {
-          transform: rotateX(0deg);
+          transform: rotateX(0deg) rotateY(0deg);
+        }
+      }
+
+      @keyframes reelGlow {
+        0%, 100% {
+          box-shadow: 0 0 30px rgba(0, 242, 255, 0.6), inset 0 0 25px rgba(0, 0, 0, 0.35);
+        }
+        50% {
+          box-shadow: 0 0 50px rgba(0, 242, 255, 0.9), inset 0 0 25px rgba(0, 0, 0, 0.35);
         }
       }
 
@@ -456,6 +472,10 @@
             Kurangi Mini Win
             <input type="range" id="mini-slider" min="0" max="100" value="40">
           </label>
+          <label style="flex-direction: row; align-items: center; gap: 8px;">
+            <input type="checkbox" id="bg-music-toggle" style="width: auto; flex: 0;">
+            <span>Background Music</span>
+          </label>
         </div>
         <div class="controls">
           <button id="spin-button">Bayar &amp; Spin</button>
@@ -497,6 +517,26 @@
             <div>
               <small>Total Spin</small>
               <strong id="spin-count">0</strong>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div>
+              <small>Total Spent</small>
+              <strong id="total-spent">Rp 0</strong>
+            </div>
+            <div>
+              <small>Total Won</small>
+              <strong id="total-won" style="color: var(--success);">Rp 0</strong>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div>
+              <small>Win Rate</small>
+              <strong id="win-rate">0%</strong>
+            </div>
+            <div>
+              <small>ROI</small>
+              <strong id="roi" style="color: var(--accent-2);">0%</strong>
             </div>
           </div>
         </div>
@@ -570,6 +610,11 @@
       let forcedJackpot = false;
       let rngProfile = "balanced";
       const confettiPieces = [];
+      let totalSpent = 0;
+      let totalWon = 0;
+      let totalWins = 0;
+      let bgMusicEnabled = false;
+      let bgMusicOscillator = null;
 
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
@@ -579,6 +624,76 @@
         }
       }
       document.addEventListener("pointerdown", unlockAudio, { once: true });
+
+      // Background music system
+      let bgMusicTimer = null;
+      
+      function startBackgroundMusic() {
+        if (bgMusicTimer) return;
+        const notes = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25]; // C major scale
+        let noteIndex = 0;
+        
+        function playNextNote() {
+          if (!bgMusicEnabled) {
+            bgMusicTimer = null;
+            return;
+          }
+          
+          const oscillator = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          oscillator.type = "sine";
+          oscillator.frequency.value = notes[noteIndex] * 0.5; // Lower octave
+          gain.gain.setValueAtTime(0, audioCtx.currentTime);
+          gain.gain.linearRampToValueAtTime(0.03, audioCtx.currentTime + 0.1);
+          gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.6);
+          
+          oscillator.connect(gain).connect(audioCtx.destination);
+          oscillator.start();
+          oscillator.stop(audioCtx.currentTime + 0.6);
+          
+          noteIndex = (noteIndex + 1) % notes.length;
+          bgMusicTimer = setTimeout(playNextNote, 600);
+        }
+        
+        playNextNote();
+      }
+
+      function stopBackgroundMusic() {
+        if (bgMusicTimer) {
+          clearTimeout(bgMusicTimer);
+          bgMusicTimer = null;
+        }
+      }
+
+      function toggleBackgroundMusic() {
+        bgMusicEnabled = !bgMusicEnabled;
+        if (bgMusicEnabled) {
+          unlockAudio();
+          startBackgroundMusic();
+        } else {
+          stopBackgroundMusic();
+        }
+      }
+
+      // Statistics update functions
+      function updateStatistics() {
+        const totalSpentEl = document.getElementById("total-spent");
+        const totalWonEl = document.getElementById("total-won");
+        const winRateEl = document.getElementById("win-rate");
+        const roiEl = document.getElementById("roi");
+        
+        if (totalSpentEl) totalSpentEl.textContent = formatMoney(totalSpent);
+        if (totalWonEl) totalWonEl.textContent = formatMoney(totalWon);
+        
+        const winRate = totalSpinsMade > 0 ? ((totalWins / totalSpinsMade) * 100).toFixed(1) : 0;
+        if (winRateEl) winRateEl.textContent = winRate + "%";
+        
+        const roi = totalSpent > 0 ? (((totalWon - totalSpent) / totalSpent) * 100).toFixed(1) : 0;
+        if (roiEl) {
+          roiEl.textContent = (roi >= 0 ? "+" : "") + roi + "%";
+          roiEl.style.color = roi >= 0 ? "var(--success)" : "var(--accent)";
+        }
+      }
 
       function randomJackpotThreshold() {
         return cryptoRandomInt(100) + 1;
@@ -706,40 +821,75 @@
         toast.timer = setTimeout(() => toast.classList.remove("show"), 2000);
       }
 
-      function playTone(freq, duration, type = "sine", gainValue = 0.12) {
+      // Enhanced audio system with better sounds
+      function playTone(freq, duration, type = "sine", gainValue = 0.12, fadeOut = true) {
         const oscillator = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         oscillator.type = type;
         oscillator.frequency.value = freq;
-        gain.gain.value = gainValue;
+        gain.gain.setValueAtTime(fadeOut ? 0 : gainValue, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(gainValue, audioCtx.currentTime + 0.01);
+        if (fadeOut) {
+          gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + duration);
+        }
         oscillator.connect(gain).connect(audioCtx.destination);
         oscillator.start();
         oscillator.stop(audioCtx.currentTime + duration);
       }
 
+      function playChord(frequencies, duration, type = "sine", gainValue = 0.1) {
+        frequencies.forEach((freq, i) => {
+          setTimeout(() => playTone(freq, duration, type, gainValue), i * 20);
+        });
+      }
+
       function playSpinSound() {
-        playTone(180, 0.2, "sawtooth", 0.08);
+        // More exciting spin sound with ascending tone
+        playTone(200, 0.15, "sawtooth", 0.1);
+        setTimeout(() => playTone(300, 0.1, "sawtooth", 0.08), 50);
+        setTimeout(() => playTone(400, 0.08, "sawtooth", 0.06), 100);
       }
 
       function playMiniSound() {
-        playTone(400, 0.15, "triangle", 0.12);
+        // Pleasant mini win sound
+        playChord([523, 659, 784], 0.3, "triangle", 0.15);
       }
 
       function playJackpotSound() {
-        playTone(880, 0.25, "square", 0.15);
-        setTimeout(() => playTone(660, 0.25, "square", 0.12), 120);
+        // Epic jackpot fanfare with chord progression
+        const fanfare = [523, 659, 784, 1047]; // C major chord + high C
+        fanfare.forEach((freq, i) => {
+          setTimeout(() => {
+            playTone(freq, 0.4, "square", 0.2);
+            if (i < fanfare.length - 1) {
+              playTone(freq * 1.5, 0.3, "sine", 0.15);
+            }
+          }, i * 100);
+        });
+        // Victory ending
+        setTimeout(() => {
+          playChord([523, 659, 784, 1047, 1319], 0.5, "sine", 0.18);
+        }, 400);
       }
 
       function launchConfetti() {
-        const colors = ["#ff3d81", "#00f2ff", "#19ff90", "#ffd56a"];
-        for (let i = 0; i < 120; i++) {
+        const colors = ["#ff3d81", "#00f2ff", "#19ff90", "#ffd56a", "#ff6b9d", "#4ecdc4", "#ffe66d"];
+        // More confetti pieces with variety
+        for (let i = 0; i < 200; i++) {
+          const angle = (Math.PI * 2 * i) / 200;
+          const velocity = Math.random() * 8 + 4;
           confettiPieces.push({
-            x: Math.random() * confettiCanvas.width,
-            y: confettiCanvas.height + Math.random() * 200,
-            size: Math.random() * 6 + 3,
-            speed: Math.random() * 3 + 2,
+            x: confettiCanvas.width / 2,
+            y: confettiCanvas.height / 2,
+            size: Math.random() * 8 + 4,
+            speed: velocity,
+            vx: Math.cos(angle) * velocity * 0.5,
+            vy: Math.sin(angle) * velocity * 0.5,
             color: colors[cryptoRandomInt(colors.length)],
-            swing: Math.random() * 2,
+            rotation: Math.random() * Math.PI * 2,
+            rotationSpeed: (Math.random() - 0.5) * 0.2,
+            shape: Math.random() > 0.5 ? "circle" : "rect",
+            gravity: 0.3 + Math.random() * 0.2,
           });
         }
       }
@@ -747,13 +897,31 @@
       function drawConfetti() {
         ctx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
         for (const piece of confettiPieces) {
-          piece.y -= piece.speed;
-          piece.x += Math.sin(piece.y * 0.01) * piece.swing;
+          piece.x += piece.vx;
+          piece.y += piece.vy;
+          piece.vy += piece.gravity;
+          piece.rotation += piece.rotationSpeed;
+          piece.vx *= 0.98; // Air resistance
+          
+          ctx.save();
+          ctx.translate(piece.x, piece.y);
+          ctx.rotate(piece.rotation);
           ctx.fillStyle = piece.color;
-          ctx.fillRect(piece.x, piece.y, piece.size, piece.size * 1.5);
+          ctx.globalAlpha = Math.max(0, 1 - (piece.y / confettiCanvas.height) * 0.5);
+          
+          if (piece.shape === "circle") {
+            ctx.beginPath();
+            ctx.arc(0, 0, piece.size / 2, 0, Math.PI * 2);
+            ctx.fill();
+          } else {
+            ctx.fillRect(-piece.size / 2, -piece.size / 2, piece.size, piece.size * 1.5);
+          }
+          ctx.restore();
         }
         for (let i = confettiPieces.length - 1; i >= 0; i--) {
-          if (confettiPieces[i].y < -50) confettiPieces.splice(i, 1);
+          if (confettiPieces[i].y > confettiCanvas.height + 100 || confettiPieces[i].x < -50 || confettiPieces[i].x > confettiCanvas.width + 50) {
+            confettiPieces.splice(i, 1);
+          }
         }
         requestAnimationFrame(drawConfetti);
       }
@@ -805,12 +973,16 @@
 
           if (state.label === "Mini Win") {
             balance += spinCost;
+            totalWon += spinCost;
+            totalWins += 1;
             rewardText = `Refund ${formatMoney(spinCost)}`;
             playMiniSound();
           } else if (state.label === "Jackpot") {
             // Reward jackpot = total cost batch × multiplier
             const reward = currentBatchCost * state.multiplier;
             balance += reward;
+            totalWon += reward;
+            totalWins += 1;
             rewardText = `Jackpot ${formatMoney(reward)}`;
             playJackpotSound();
           }
@@ -819,6 +991,7 @@
           updateReels(result, state);
           pushHistory(result, state, rewardText);
           registerOutcome(state, comboScore);
+          updateStatistics();
           if (state.label === "Jackpot") launchConfetti();
 
           queuedSpins -= 1;
@@ -843,8 +1016,10 @@
           return;
         }
         balance -= required;
+        totalSpent += required;
         currentBatchCost = required; // Simpan total cost batch untuk reward jackpot
         updateBalanceDisplay();
+        updateStatistics();
         queuedSpins = batchSize;
         processSpinQueue();
       }
@@ -860,6 +1035,9 @@
         forcedJackpot = false;
         queuedSpins = 0;
         currentBatchCost = 0;
+        totalSpent = 0;
+        totalWon = 0;
+        totalWins = 0;
         reels.forEach((reel, idx) => {
           reel.textContent = symbols[idx];
           reel.classList.remove("win", "warn", "spinning");
@@ -870,6 +1048,7 @@
         bestComboEl.className = "badge";
         spinCountEl.textContent = "0";
         updateJackpotMeter();
+        updateStatistics();
         spinButton.disabled = false;
         resetButton.disabled = true;
         isSpinning = false;
@@ -899,6 +1078,14 @@
         showToast(`Profil RNG: ${event.target.options[event.target.selectedIndex].text}`);
       });
 
+      const bgMusicToggle = document.getElementById("bg-music-toggle");
+      if (bgMusicToggle) {
+        bgMusicToggle.addEventListener("change", (event) => {
+          toggleBackgroundMusic();
+          showToast(bgMusicEnabled ? "Background music ON" : "Background music OFF");
+        });
+      }
+
       spinButton.addEventListener("click", requestSpin);
       resetButton.addEventListener("click", resetGame);
 
@@ -919,6 +1106,7 @@
 
       updateBalanceDisplay();
       updateJackpotMeter();
+      updateStatistics();
       spinRange.dispatchEvent(new Event("input"));
     </script>
   </body>
