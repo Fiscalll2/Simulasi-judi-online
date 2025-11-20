@@ -124,7 +124,7 @@
       }
 
       .reel.spinning .reel-content {
-        animation: reelScroll 0.1s linear infinite;
+        animation: none; /* Will be controlled by JavaScript */
       }
 
       .reel.revealing {
@@ -826,28 +826,35 @@
         }
       }
 
-      function populateReelContent(reel, resultSymbol = null) {
+      function populateReelContent(reel, finalSymbol = null) {
         const reelContent = reel.querySelector(".reel-content");
         if (!reelContent) return;
         
         // Generate banyak symbols untuk scrolling effect yang smooth
         const allSymbols = [];
-        const cycles = 15; // Banyak cycles untuk smooth scrolling
+        const cycles = 20; // Banyak cycles untuk smooth scrolling
+        
+        // Generate random symbols untuk spinning effect
         for (let i = 0; i < cycles; i++) {
-          allSymbols.push(...symbols);
+          for (let j = 0; j < symbols.length; j++) {
+            allSymbols.push(symbols[cryptoRandomInt(symbols.length)]);
+          }
         }
         
-        // Jika ada resultSymbol, pastikan dia ada di tengah (visible area)
-        if (resultSymbol) {
-          const symbolIndex = symbols.indexOf(resultSymbol);
+        // Jika ada finalSymbol, pastikan dia ada di posisi yang tepat untuk stop
+        if (finalSymbol) {
+          const symbolIndex = symbols.indexOf(finalSymbol);
           const middleIndex = Math.floor(allSymbols.length / 2);
-          // Place result symbol di tengah dengan neighbors
-          allSymbols[middleIndex] = resultSymbol;
-          if (middleIndex > 0) {
-            allSymbols[middleIndex - 1] = symbols[(symbolIndex - 1 + symbols.length) % symbols.length];
-          }
-          if (middleIndex < allSymbols.length - 1) {
-            allSymbols[middleIndex + 1] = symbols[(symbolIndex + 1) % symbols.length];
+          // Place final symbol di tengah dengan neighbors yang sesuai
+          allSymbols[middleIndex] = finalSymbol;
+          // Place neighbors untuk smooth transition
+          for (let i = 1; i <= 3; i++) {
+            if (middleIndex - i >= 0) {
+              allSymbols[middleIndex - i] = symbols[(symbolIndex - i + symbols.length * 10) % symbols.length];
+            }
+            if (middleIndex + i < allSymbols.length) {
+              allSymbols[middleIndex + i] = symbols[(symbolIndex + i) % symbols.length];
+            }
           }
         }
         
@@ -863,15 +870,86 @@
         reelContent.style.transform = "translateY(0)";
       }
 
-      function startRolling() {
-        reels.forEach((reel, index) => {
-          reel.classList.add("spinning");
-          const reelContent = reel.querySelector(".reel-content");
-          if (reelContent) {
-            // Populate dengan random symbols untuk animasi
-            const randomSymbol = symbols[cryptoRandomInt(symbols.length)];
-            populateReelContent(reel, randomSymbol);
+      function animateReelSpinning(reel, index, finalSymbol, callback) {
+        const reelContent = reel.querySelector(".reel-content");
+        if (!reelContent) {
+          if (callback) callback();
+          return;
+        }
+        
+        // Populate dengan random symbols untuk spinning
+        populateReelContent(reel, null);
+        
+        let scrollPosition = 0;
+        let speed = 80; // Fast initial speed
+        const minSpeed = 3;
+        const deceleration = 0.92; // Slow down factor (lebih cepat melambat)
+        const symbolHeight = 100 / (20 * symbols.length); // Height per symbol
+        
+        // Calculate final position
+        const totalSymbols = 20 * symbols.length;
+        const finalSymbolIndex = symbols.indexOf(finalSymbol);
+        const targetMiddleIndex = Math.floor(totalSymbols / 2);
+        const finalY = -(targetMiddleIndex * symbolHeight) + (33.33 / 2);
+        
+        // Update symbols during spinning untuk efek random (mencegah stuck)
+        let symbolUpdateInterval = null;
+        let animationFrameId = null;
+        
+        function animate() {
+          if (speed > minSpeed) {
+            // Still spinning - update position
+            scrollPosition += speed;
+            reelContent.style.transform = `translateY(-${scrollPosition}%)`;
+            speed *= deceleration;
+            
+            // Update random symbols saat masih cepat untuk efek realistis
+            if (speed > minSpeed * 3 && !symbolUpdateInterval) {
+              symbolUpdateInterval = setInterval(() => {
+                const symbolDivs = reelContent.querySelectorAll(".reel-symbol");
+                if (symbolDivs.length > 0) {
+                  // Update beberapa random symbols
+                  for (let i = 0; i < 3; i++) {
+                    const randomIndex = cryptoRandomInt(symbolDivs.length);
+                    symbolDivs[randomIndex].textContent = symbols[cryptoRandomInt(symbols.length)];
+                  }
+                }
+              }, 80);
+            }
+            
+            animationFrameId = requestAnimationFrame(animate);
+          } else {
+            // Slow down phase - prepare for final position
+            if (symbolUpdateInterval) {
+              clearInterval(symbolUpdateInterval);
+              symbolUpdateInterval = null;
+            }
+            
+            // Populate dengan final symbol di posisi yang tepat
+            populateReelContent(reel, finalSymbol);
+            
+            // Smooth transition to final position
+            reelContent.style.transition = "transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94)";
+            setTimeout(() => {
+              reelContent.style.transform = `translateY(${finalY}%)`;
+              if (callback) {
+                // Delay sedikit sebelum callback untuk efek final
+                setTimeout(callback, 300);
+              }
+            }, 50);
           }
+        }
+        
+        // Start animation dengan delay berbeda untuk setiap reel (sequential reveal)
+        const delay = index * 400; // Delay semakin lama untuk suspense
+        setTimeout(() => {
+          animate();
+        }, delay);
+      }
+
+      function startRolling() {
+        reels.forEach((reel) => {
+          reel.classList.add("spinning");
         });
         playSpinSound();
       }
@@ -884,51 +962,29 @@
 
       function revealReelSequentially(result, state, callback) {
         let revealedCount = 0;
+        const reelCallbacks = [];
         
-        function revealNext() {
-          if (revealedCount >= reels.length) {
-            if (callback) callback();
-            return;
-          }
-          
-          const reel = reels[revealedCount];
-          const targetSymbol = result[revealedCount];
-          
-          // Stop spinning untuk reel ini
-          reel.classList.remove("spinning");
+        // Start semua reel spinning dengan delay berbeda
+        reels.forEach((reel, index) => {
+          const targetSymbol = result[index];
           reel.classList.add("revealing");
           
-          // Set final symbol dengan animasi
-          const reelContent = reel.querySelector(".reel-content");
-          if (reelContent) {
-            // Populate dengan target symbol di tengah
-            populateReelContent(reel, targetSymbol);
+          // Animate reel dengan deceleration
+          animateReelSpinning(reel, index, targetSymbol, () => {
+            // Reel selesai spinning
+            reel.classList.remove("spinning");
             
-            // Calculate target position (middle symbol - 1/3 dari total height untuk center)
-            const totalSymbols = 15 * symbols.length; // Total symbols in reel
-            const symbolHeight = 100 / totalSymbols; // Percentage height per symbol
-            const middleIndex = Math.floor(totalSymbols / 2);
-            // Target: middle symbol minus 1/3 height untuk center di viewport
-            const targetY = -(middleIndex * symbolHeight) + (33.33 / 2);
+            // Play reveal sound dengan pitch berbeda untuk setiap reel
+            playTone(300 + index * 150, 0.25, "sine", 0.12);
             
-            // Animate to final position dengan easing yang smooth
-            reelContent.style.transition = "transform 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94)";
-            setTimeout(() => {
-              reelContent.style.transform = `translateY(${targetY}%)`;
-            }, 50);
-          }
-          
-          // Play reveal sound dengan pitch berbeda untuk setiap reel
-          playTone(300 + revealedCount * 150, 0.25, "sine", 0.12);
-          
-          revealedCount++;
-          
-          // Reveal next reel setelah delay (suspense semakin besar!)
-          const delay = 900 + revealedCount * 250; // Delay semakin lama untuk suspense
-          setTimeout(revealNext, delay);
-        }
-        
-        revealNext();
+            revealedCount++;
+            
+            // Jika semua reel selesai, call main callback
+            if (revealedCount >= reels.length) {
+              if (callback) callback();
+            }
+          });
+        });
       }
 
       function updateReels(result, state, callback) {
@@ -1157,11 +1213,13 @@
         }
         isSpinning = true;
         spinButton.disabled = true;
-        startRolling();
         const { result, state } = biasedResult();
 
+        // Start rolling animation untuk semua reel
+        startRolling();
+        
+        // Setelah delay, mulai reveal sequential dengan animasi deceleration
         setTimeout(() => {
-          stopRolling();
           const comboScore = result.reduce((sum, symbol) => sum + rarityScore[symbol], 0);
           
           // Update reels dengan reveal sequential (suspense!)
@@ -1194,7 +1252,7 @@
             queuedSpins -= 1;
             setTimeout(processSpinQueue, 500);
           });
-        }, 1500); // Spin lebih lama untuk efek suspense
+        }, 800); // Delay sebelum mulai reveal
       }
 
       function requireSession() {
