@@ -439,7 +439,7 @@
         <div class="batch-controls">
           <label>
             Jumlah spin per klik
-            <strong id="batch-label">1x (Rp 1.000)</strong>
+            <strong id="batch-label">1x (Rp 10.000)</strong>
           </label>
           <input type="range" id="spin-range" min="1" max="10" value="1">
         </div>
@@ -474,7 +474,7 @@
             </div>
             <div>
               <small>Biaya / Spin</small>
-              <strong>Rp 1.000</strong>
+              <strong>Rp 10.000</strong>
             </div>
           </div>
           <div class="stat-card">
@@ -529,7 +529,7 @@
         "\u{1FA99}": 2,
         "\u{1F3B2}": 1
       };
-      const spinCost = 1000;
+      const spinCost = 10000;
 
       const reels = Array.from(document.querySelectorAll(".reel"));
       const spinButton = document.getElementById("spin-button");
@@ -561,6 +561,7 @@
       let queuedSpins = 0;
       let isSpinning = false;
       let rollingIntervals = [];
+      let currentBatchCost = 0;
       let bestComboScore = 0;
       let totalSpinsMade = 0;
       let jackpotCount = 0;
@@ -614,7 +615,7 @@
 
       function evaluate(result) {
         const unique = new Set(result);
-        if (unique.size === 1) return { label: "Jackpot", multiplier: 2, badge: "jackpot" };
+        if (unique.size === 1) return { label: "Jackpot", multiplier: 10, badge: "jackpot" };
         if (unique.size === 2) return { label: "Mini Win", multiplier: 1, badge: "mini" };
         return { label: "Spin Biasa", multiplier: 0, badge: "" };
       }
@@ -789,6 +790,7 @@
           isSpinning = false;
           spinButton.disabled = false;
           resetButton.disabled = false;
+          currentBatchCost = 0;
           return;
         }
         isSpinning = true;
@@ -806,7 +808,8 @@
             rewardText = `Refund ${formatMoney(spinCost)}`;
             playMiniSound();
           } else if (state.label === "Jackpot") {
-            const reward = spinCost * state.multiplier;
+            // Reward jackpot = total cost batch × multiplier
+            const reward = currentBatchCost * state.multiplier;
             balance += reward;
             rewardText = `Jackpot ${formatMoney(reward)}`;
             playJackpotSound();
@@ -840,6 +843,7 @@
           return;
         }
         balance -= required;
+        currentBatchCost = required; // Simpan total cost batch untuk reward jackpot
         updateBalanceDisplay();
         queuedSpins = batchSize;
         processSpinQueue();
@@ -855,6 +859,7 @@
         jackpotThreshold = randomJackpotThreshold();
         forcedJackpot = false;
         queuedSpins = 0;
+        currentBatchCost = 0;
         reels.forEach((reel, idx) => {
           reel.textContent = symbols[idx];
           reel.classList.remove("win", "warn", "spinning");
