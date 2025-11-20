@@ -1,0 +1,920 @@
+﻿<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Jackpot 5x Spin</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+        --bg: #060814;
+        --card: rgba(17, 22, 44, 0.85);
+        --accent: #ff3d81;
+        --accent-2: #00f2ff;
+        --text-muted: #b0b5d1;
+        --success: #19ff90;
+        --warning: #ffb347;
+        --glow: 0 0 25px rgba(0, 242, 255, 0.35);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      button,
+      input,
+      select {
+        font-family: inherit;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: radial-gradient(circle at top, rgba(0, 242, 255, 0.15), transparent 45%),
+          linear-gradient(135deg, #030712, #050922 50%, #030712);
+        color: #fff;
+        display: block;
+        padding: 32px 16px 48px;
+        overflow-x: hidden;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      main {
+        width: min(1300px, 100%);
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+        gap: 24px;
+        padding-bottom: 32px;
+      }
+
+      .panel {
+        background: var(--card);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 28px;
+        padding: 32px;
+        box-shadow: var(--glow);
+        backdrop-filter: blur(8px);
+      }
+
+      header h1 {
+        margin: 0;
+        font-size: clamp(2.2rem, 4vw, 3.2rem);
+        color: var(--accent);
+        letter-spacing: 0.05em;
+      }
+
+      #player-tag {
+        font-size: clamp(1rem, 3vw, 1.4rem);
+        color: var(--accent-2);
+        display: inline-block;
+        margin-top: 8px;
+      }
+
+      header span.badge {
+        margin-left: 8px;
+        background: rgba(255, 255, 255, 0.08);
+        padding: 6px 14px;
+        border-radius: 999px;
+        font-size: 0.9rem;
+        letter-spacing: 0.08em;
+      }
+
+      .reels {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(90px, 1fr));
+        gap: 18px;
+        margin: 28px 0;
+      }
+
+      .reel {
+        aspect-ratio: 3 / 4;
+        border-radius: 20px;
+        background: linear-gradient(145deg, rgba(4, 8, 30, 0.8), rgba(10, 14, 45, 0.95));
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: clamp(3.2rem, 8vw, 4.6rem);
+        transition: transform 160ms ease, border 160ms ease, box-shadow 160ms ease;
+        box-shadow: inset 0 0 25px rgba(0, 0, 0, 0.35);
+      }
+
+      .reel.spinning {
+        animation: reelSpin 0.5s linear infinite;
+        filter: blur(2px);
+        opacity: 0.8;
+      }
+
+      .reel.win {
+        border-color: var(--success);
+        box-shadow: 0 0 25px rgba(25, 255, 144, 0.45);
+        transform: translateY(-6px) scale(1.03);
+      }
+
+      .reel.warn {
+        border-color: var(--warning);
+        box-shadow: 0 0 25px rgba(255, 179, 71, 0.35);
+      }
+
+      .controls,
+      .wallet-controls,
+      .batch-controls,
+      .settings-panel {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 18px;
+      }
+
+      .wallet-controls input,
+      .settings-panel select,
+      .settings-panel input[type="range"] {
+        flex: 1;
+        padding: 14px 16px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        background: rgba(255, 255, 255, 0.04);
+        color: #fff;
+      }
+
+      .settings-panel label {
+        flex: 1;
+        font-size: 0.9rem;
+        color: var(--text-muted);
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .wallet-controls button,
+      .controls button {
+        flex: 1;
+        padding: 16px 22px;
+        border-radius: 14px;
+        font-weight: 600;
+        border: none;
+        cursor: pointer;
+        font-size: 1rem;
+        transition: transform 120ms ease, opacity 120ms ease, box-shadow 120ms ease;
+        touch-action: manipulation;
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.4;
+      }
+
+      #spin-button {
+        background: linear-gradient(120deg, var(--accent), var(--accent-2));
+        color: #fff;
+        box-shadow: 0 10px 25px rgba(255, 61, 129, 0.35);
+      }
+
+      #reset-button {
+        background: rgba(255, 255, 255, 0.08);
+        color: #fff;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      #deposit-button {
+        background: rgba(25, 255, 144, 0.15);
+        color: var(--success);
+        border: 1px solid rgba(25, 255, 144, 0.4);
+      }
+
+      .batch-controls {
+        flex-direction: column;
+      }
+
+      .batch-controls label {
+        font-size: 0.9rem;
+        color: var(--text-muted);
+        display: flex;
+        justify-content: space-between;
+      }
+
+      .batch-controls input[type="range"] {
+        width: 100%;
+      }
+
+      .stats {
+        display: grid;
+        gap: 14px;
+        margin-top: 30px;
+      }
+
+      .stat-card {
+        padding: 18px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .stat-card strong {
+        font-size: 1.5rem;
+        color: var(--accent-2);
+      }
+
+      .stat-card strong.balance {
+        color: var(--success);
+      }
+
+      .progress {
+        position: relative;
+        height: 12px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+        overflow: hidden;
+      }
+
+      .progress-fill {
+        position: absolute;
+        inset: 0;
+        width: 0%;
+        border-radius: inherit;
+        background: linear-gradient(120deg, var(--accent-2), var(--success));
+        transition: width 240ms ease;
+      }
+
+      .history {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 12px;
+        max-height: min(420px, 55vh);
+        overflow: auto;
+      }
+
+      .history li {
+        padding: 16px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.04);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        font-size: 0.95rem;
+        color: var(--text-muted);
+      }
+
+      .history strong {
+        color: #fff;
+      }
+
+      .badge {
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .badge.jackpot {
+        background: rgba(25, 255, 144, 0.2);
+        color: var(--success);
+      }
+
+      .badge.mini {
+        background: rgba(255, 179, 71, 0.2);
+        color: var(--warning);
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%) translateY(150%);
+        padding: 14px 22px;
+        border-radius: 999px;
+        background: rgba(3, 20, 30, 0.85);
+        border: 1px solid rgba(0, 242, 255, 0.3);
+        color: #fff;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        box-shadow: var(--glow);
+        transition: transform 180ms ease;
+        z-index: 20;
+      }
+
+      .toast.show {
+        transform: translateX(-50%) translateY(0);
+      }
+
+      canvas#confetti {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 15;
+      }
+
+      .gate {
+        position: fixed;
+        inset: 0;
+        background: rgba(3, 8, 20, 0.95);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        z-index: 30;
+        padding: 16px;
+        overflow-y: auto;
+      }
+
+      .gate form {
+        background: rgba(17, 22, 44, 0.9);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 24px;
+        padding: 32px;
+        width: min(360px, 90%);
+        text-align: center;
+        box-shadow: var(--glow);
+      }
+
+      .gate input {
+        width: 100%;
+        padding: 14px 16px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.05);
+        color: #fff;
+        margin: 14px 0;
+      }
+
+      .gate button {
+        width: 100%;
+        padding: 14px;
+        border-radius: 12px;
+        border: none;
+        font-weight: 600;
+        background: linear-gradient(120deg, var(--accent), var(--accent-2));
+        color: #fff;
+        cursor: pointer;
+      }
+
+      .gate.hide {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 300ms ease;
+      }
+
+      @keyframes reelSpin {
+        0% {
+          transform: rotateX(0deg);
+        }
+        50% {
+          transform: rotateX(35deg);
+        }
+        100% {
+          transform: rotateX(0deg);
+        }
+      }
+
+      @media (max-width: 720px) {
+        .panel {
+          padding: 24px;
+          margin-bottom: 20px;
+        }
+
+        .reels {
+          grid-template-columns: repeat(3, minmax(70px, 1fr));
+        }
+
+        .controls,
+        .wallet-controls,
+        .settings-panel {
+          flex-direction: column;
+        }
+
+        main {
+          grid-template-columns: 1fr;
+          padding-bottom: 72px;
+        }
+
+        .history {
+          max-height: unset;
+        }
+      }
+
+      @media (max-width: 480px) {
+        body {
+          padding: 24px 14px 48px;
+        }
+
+        .gate form {
+          padding: 24px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="gate" id="entry-gate">
+      <form id="gate-form">
+        <h2 style="margin:0 0 12px">Selamat datang</h2>
+        <p style="margin:0;color:var(--text-muted)">Masukkan nama panggilanmu sebelum mulai nge-spin.</p>
+        <input type="text" id="player-input" maxlength="16" placeholder="Contoh: SultanGacor" required>
+        <button type="submit">Masuk ke Jackpot Rush</button>
+      </form>
+    </div>
+    <canvas id="confetti"></canvas>
+    <main>
+      <section class="panel">
+        <header>
+          <h1>Jackpot Rush <span class="badge">always gacor</span></h1>
+          <p style="margin:6px 0 0;color:var(--text-muted)">Cuma di sini spin terasa gacor&mdash;setiap klik ada risiko, ada cuan.</p>
+          <div id="player-tag">Player: ???</div>
+        </header>
+        <div class="wallet-controls">
+          <input type="number" id="deposit-input" min="1000" step="1000" value="10000" placeholder="Jumlah top up (IDR)">
+          <button id="deposit-button">Top Up Saldo</button>
+        </div>
+        <div class="batch-controls">
+          <label>
+            Jumlah spin per klik
+            <strong id="batch-label">1x (Rp 1.000)</strong>
+          </label>
+          <input type="range" id="spin-range" min="1" max="10" value="1">
+        </div>
+        <div class="settings-panel">
+          <label>
+            Profil RNG
+            <select id="rng-profile">
+              <option value="balanced">Balanced</option>
+              <option value="gacor">Gacor (lebih banyak jackpot)</option>
+              <option value="ampas">Ampas (lebih banyak spin biasa)</option>
+            </select>
+          </label>
+          <label>
+            Kurangi Mini Win
+            <input type="range" id="mini-slider" min="0" max="100" value="40">
+          </label>
+        </div>
+        <div class="controls">
+          <button id="spin-button">Bayar &amp; Spin</button>
+          <button id="reset-button" disabled>Reset Tantangan</button>
+        </div>
+        <div class="reels" id="reels">
+          <div class="reel">&#x1F48E;</div>
+          <div class="reel">&#x2B50;</div>
+          <div class="reel">&#x1F349;</div>
+        </div>
+        <div class="stats">
+          <div class="stat-card">
+            <div>
+              <small>Saldo Uang Mainan</small>
+              <strong id="balance-display" class="balance">Rp 0</strong>
+            </div>
+            <div>
+              <small>Biaya / Spin</small>
+              <strong>Rp 1.000</strong>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div>
+              <small>Total Jackpot</small>
+              <strong id="total-win">0x</strong>
+            </div>
+            <div>
+              <small>Jackpot Meter</small>
+              <div class="progress" aria-label="jackpot progress">
+                <div class="progress-fill" id="jackpot-meter"></div>
+              </div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div>
+              <small>Combo Terbaik</small>
+              <div id="best-combo" class="badge">-</div>
+            </div>
+            <div>
+              <small>Total Spin</small>
+              <strong id="spin-count">0</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section class="panel">
+        <h2 style="margin-top: 0">Log Spin</h2>
+        <p style="color: var(--text-muted); margin-top: 4px">Track biaya, refund, dan kemenangan.</p>
+        <ul class="history" id="history"></ul>
+      </section>
+    </main>
+    <div class="toast" id="toast"></div>
+    <script>
+      const symbols = [
+        "\u{1F48E}",
+        "\u{1F352}",
+        "7\u{FE0F}\u{20E3}",
+        "\u{2B50}",
+        "\u{1F349}",
+        "\u{1F514}",
+        "\u{1FA99}",
+        "\u{1F3B2}"
+      ];
+      const rarityScore = {
+        "\u{1F48E}": 5,
+        "7\u{FE0F}\u{20E3}": 5,
+        "\u{2B50}": 4,
+        "\u{1F352}": 3,
+        "\u{1F514}": 3,
+        "\u{1F349}": 2,
+        "\u{1FA99}": 2,
+        "\u{1F3B2}": 1
+      };
+      const spinCost = 1000;
+
+      const reels = Array.from(document.querySelectorAll(".reel"));
+      const spinButton = document.getElementById("spin-button");
+      const resetButton = document.getElementById("reset-button");
+      const depositInput = document.getElementById("deposit-input");
+      const depositButton = document.getElementById("deposit-button");
+      const spinRange = document.getElementById("spin-range");
+      const batchLabel = document.getElementById("batch-label");
+      const rngProfileSelect = document.getElementById("rng-profile");
+      const miniSlider = document.getElementById("mini-slider");
+      const balanceDisplay = document.getElementById("balance-display");
+      const jackpotMeter = document.getElementById("jackpot-meter");
+      const totalWinEl = document.getElementById("total-win");
+      const bestComboEl = document.getElementById("best-combo");
+      const spinCountEl = document.getElementById("spin-count");
+      const historyEl = document.getElementById("history");
+      const toast = document.getElementById("toast");
+      const confettiCanvas = document.getElementById("confetti");
+      const ctx = confettiCanvas.getContext("2d");
+      const gateForm = document.getElementById("gate-form");
+      const gate = document.getElementById("entry-gate");
+      const playerInput = document.getElementById("player-input");
+      const playerTag = document.getElementById("player-tag");
+
+      let playerName = "???";
+      let sessionReady = false;
+      let balance = 0;
+      let batchSize = 1;
+      let queuedSpins = 0;
+      let isSpinning = false;
+      let rollingIntervals = [];
+      let bestComboScore = 0;
+      let totalSpinsMade = 0;
+      let jackpotCount = 0;
+      let jackpotProgress = 0;
+      let jackpotThreshold = randomJackpotThreshold();
+      let forcedJackpot = false;
+      let rngProfile = "balanced";
+      const confettiPieces = [];
+
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+      function unlockAudio() {
+        if (audioCtx.state === "suspended") {
+          audioCtx.resume();
+        }
+      }
+      document.addEventListener("pointerdown", unlockAudio, { once: true });
+
+      function randomJackpotThreshold() {
+        return cryptoRandomInt(100) + 1;
+      }
+
+      function resizeCanvas() {
+        confettiCanvas.width = window.innerWidth;
+        confettiCanvas.height = window.innerHeight;
+      }
+
+      window.addEventListener("resize", resizeCanvas);
+      resizeCanvas();
+
+      function formatMoney(value) {
+        return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(value);
+      }
+
+      function updateBalanceDisplay() {
+        balanceDisplay.textContent = formatMoney(balance);
+      }
+
+      function cryptoRandomInt(max) {
+        if (window.crypto && window.crypto.getRandomValues) {
+          const array = new Uint32Array(1);
+          window.crypto.getRandomValues(array);
+          return array[0] % max;
+        }
+        return Math.floor(Math.random() * max);
+      }
+
+      function rollSymbols() {
+        return reels.map(() => symbols[cryptoRandomInt(symbols.length)]);
+      }
+
+      function evaluate(result) {
+        const unique = new Set(result);
+        if (unique.size === 1) return { label: "Jackpot", multiplier: 2, badge: "jackpot" };
+        if (unique.size === 2) return { label: "Mini Win", multiplier: 1, badge: "mini" };
+        return { label: "Spin Biasa", multiplier: 0, badge: "" };
+      }
+
+      function startRolling() {
+        reels.forEach((reel, index) => {
+          reel.classList.add("spinning");
+          const interval = setInterval(() => {
+            reel.textContent = symbols[cryptoRandomInt(symbols.length)];
+          }, 80 + index * 20);
+          rollingIntervals[index] = interval;
+        });
+        playSpinSound();
+      }
+
+      function stopRolling() {
+        rollingIntervals.forEach((interval) => clearInterval(interval));
+        rollingIntervals = [];
+        reels.forEach((reel) => reel.classList.remove("spinning"));
+      }
+
+      function updateReels(result, state) {
+        reels.forEach((reel, index) => {
+          reel.textContent = result[index];
+          reel.classList.remove("win", "warn");
+        });
+        requestAnimationFrame(() => {
+          if (state.badge === "jackpot") {
+            reels.forEach((reel) => reel.classList.add("win"));
+          } else if (state.badge === "mini") {
+            reels.forEach((reel) => reel.classList.add("warn"));
+          }
+        });
+      }
+
+      function pushHistory(result, state, rewardText) {
+        const li = document.createElement("li");
+        li.innerHTML = `
+          <span><strong>${result.join(" ")}</strong></span>
+          <span>${state.label} &middot; ${rewardText} ${state.badge ? `<span class="badge ${state.badge}">${state.label}</span>` : ""}</span>
+        `;
+        historyEl.prepend(li);
+      }
+
+      function updateJackpotMeter() {
+        const percent = Math.min(100, Math.round((jackpotProgress / jackpotThreshold) * 100));
+        jackpotMeter.style.width = percent + "%";
+      }
+
+      function advanceJackpotProgress() {
+        if (forcedJackpot) return;
+        jackpotProgress += cryptoRandomInt(5) + 1;
+        if (jackpotProgress >= jackpotThreshold) {
+          jackpotProgress = jackpotThreshold;
+          forcedJackpot = true;
+          updateJackpotMeter();
+          showToast("Jackpot meter penuh! Spin berikut dijamin jackpot.");
+          return;
+        }
+        updateJackpotMeter();
+      }
+
+      function registerOutcome(state, comboScore) {
+        totalSpinsMade += 1;
+        spinCountEl.textContent = totalSpinsMade;
+        if (comboScore > bestComboScore) {
+          bestComboScore = comboScore;
+          bestComboEl.textContent = state.label;
+          bestComboEl.className = `badge ${state.badge || ""}`.trim();
+        }
+
+        if (state.label === "Jackpot") {
+          jackpotCount += 1;
+          totalWinEl.textContent = `${jackpotCount}x`;
+          jackpotProgress = 0;
+          jackpotThreshold = randomJackpotThreshold();
+          forcedJackpot = false;
+          updateJackpotMeter();
+        } else {
+          advanceJackpotProgress();
+        }
+      }
+
+      function showToast(message) {
+        toast.textContent = message;
+        toast.classList.add("show");
+        clearTimeout(showToast.timer);
+        toast.timer = setTimeout(() => toast.classList.remove("show"), 2000);
+      }
+
+      function playTone(freq, duration, type = "sine", gainValue = 0.12) {
+        const oscillator = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        oscillator.type = type;
+        oscillator.frequency.value = freq;
+        gain.gain.value = gainValue;
+        oscillator.connect(gain).connect(audioCtx.destination);
+        oscillator.start();
+        oscillator.stop(audioCtx.currentTime + duration);
+      }
+
+      function playSpinSound() {
+        playTone(180, 0.2, "sawtooth", 0.08);
+      }
+
+      function playMiniSound() {
+        playTone(400, 0.15, "triangle", 0.12);
+      }
+
+      function playJackpotSound() {
+        playTone(880, 0.25, "square", 0.15);
+        setTimeout(() => playTone(660, 0.25, "square", 0.12), 120);
+      }
+
+      function launchConfetti() {
+        const colors = ["#ff3d81", "#00f2ff", "#19ff90", "#ffd56a"];
+        for (let i = 0; i < 120; i++) {
+          confettiPieces.push({
+            x: Math.random() * confettiCanvas.width,
+            y: confettiCanvas.height + Math.random() * 200,
+            size: Math.random() * 6 + 3,
+            speed: Math.random() * 3 + 2,
+            color: colors[cryptoRandomInt(colors.length)],
+            swing: Math.random() * 2,
+          });
+        }
+      }
+
+      function drawConfetti() {
+        ctx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+        for (const piece of confettiPieces) {
+          piece.y -= piece.speed;
+          piece.x += Math.sin(piece.y * 0.01) * piece.swing;
+          ctx.fillStyle = piece.color;
+          ctx.fillRect(piece.x, piece.y, piece.size, piece.size * 1.5);
+        }
+        for (let i = confettiPieces.length - 1; i >= 0; i--) {
+          if (confettiPieces[i].y < -50) confettiPieces.splice(i, 1);
+        }
+        requestAnimationFrame(drawConfetti);
+      }
+
+      drawConfetti();
+
+      function biasedResult() {
+        if (forcedJackpot) {
+          const symbol = symbols[cryptoRandomInt(symbols.length)];
+          return { result: [symbol, symbol, symbol], state: { label: "Jackpot", multiplier: 2, badge: "jackpot" } };
+        }
+        let attempt = 0;
+        const miniAvoid = miniSlider.value / 100;
+        while (attempt < 25) {
+          const rolled = rollSymbols();
+          const state = evaluate(rolled);
+          if (state.label === "Mini Win" && Math.random() < miniAvoid) {
+            attempt++;
+            continue;
+          }
+          if (rngProfile === "gacor" && Math.random() < 0.6) {
+            if (state.label === "Jackpot") return { result: rolled, state };
+          }
+          if (rngProfile === "ampas" && Math.random() < 0.6) {
+            if (state.label === "Spin Biasa") return { result: rolled, state };
+          }
+          return { result: rolled, state };
+        }
+        return { result: rollSymbols(), state: evaluate(rollSymbols()) };
+      }
+
+      function processSpinQueue() {
+        if (queuedSpins <= 0) {
+          isSpinning = false;
+          spinButton.disabled = false;
+          resetButton.disabled = false;
+          return;
+        }
+        isSpinning = true;
+        spinButton.disabled = true;
+        startRolling();
+        const { result, state } = biasedResult();
+
+        setTimeout(() => {
+          stopRolling();
+          const comboScore = result.reduce((sum, symbol) => sum + rarityScore[symbol], 0);
+          let rewardText = "Hangus";
+
+          if (state.label === "Mini Win") {
+            balance += spinCost;
+            rewardText = `Refund ${formatMoney(spinCost)}`;
+            playMiniSound();
+          } else if (state.label === "Jackpot") {
+            const reward = spinCost * state.multiplier;
+            balance += reward;
+            rewardText = `Jackpot ${formatMoney(reward)}`;
+            playJackpotSound();
+          }
+
+          updateBalanceDisplay();
+          updateReels(result, state);
+          pushHistory(result, state, rewardText);
+          registerOutcome(state, comboScore);
+          if (state.label === "Jackpot") launchConfetti();
+
+          queuedSpins -= 1;
+          setTimeout(processSpinQueue, 280);
+        }, 1100);
+      }
+
+      function requireSession() {
+        if (!sessionReady) {
+          showToast("Masukkan nama dulu!");
+          return true;
+        }
+        return false;
+      }
+
+      function requestSpin() {
+        if (requireSession() || isSpinning) return;
+        unlockAudio();
+        const required = batchSize * spinCost;
+        if (balance < required) {
+          showToast("Saldo tidak cukup. Top up dulu!");
+          return;
+        }
+        balance -= required;
+        updateBalanceDisplay();
+        queuedSpins = batchSize;
+        processSpinQueue();
+      }
+
+      function resetGame() {
+        if (requireSession()) return;
+        stopRolling();
+        bestComboScore = 0;
+        totalSpinsMade = 0;
+        jackpotCount = 0;
+        jackpotProgress = 0;
+        jackpotThreshold = randomJackpotThreshold();
+        forcedJackpot = false;
+        queuedSpins = 0;
+        reels.forEach((reel, idx) => {
+          reel.textContent = symbols[idx];
+          reel.classList.remove("win", "warn", "spinning");
+        });
+        historyEl.innerHTML = "";
+        totalWinEl.textContent = "0x";
+        bestComboEl.textContent = "-";
+        bestComboEl.className = "badge";
+        spinCountEl.textContent = "0";
+        updateJackpotMeter();
+        spinButton.disabled = false;
+        resetButton.disabled = true;
+        isSpinning = false;
+      }
+
+      depositButton.addEventListener("click", () => {
+        if (requireSession()) return;
+        const amount = Number(depositInput.value);
+        if (!amount || amount < 1000) {
+          showToast("Minimal top up Rp 1.000");
+          return;
+        }
+        balance += amount;
+        updateBalanceDisplay();
+        showToast(`Saldo bertambah ${formatMoney(amount)}`);
+        depositInput.value = "";
+      });
+
+      spinRange.addEventListener("input", (event) => {
+        batchSize = Number(event.target.value);
+        const totalCost = batchSize * spinCost;
+        batchLabel.textContent = `${batchSize}x (Rp ${totalCost.toLocaleString("id-ID")})`;
+      });
+
+      rngProfileSelect.addEventListener("change", (event) => {
+        rngProfile = event.target.value;
+        showToast(`Profil RNG: ${event.target.options[event.target.selectedIndex].text}`);
+      });
+
+      spinButton.addEventListener("click", requestSpin);
+      resetButton.addEventListener("click", resetGame);
+
+      gateForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const name = playerInput.value.trim();
+        if (!name) {
+          showToast("Isi nama dulu dong");
+          return;
+        }
+        playerName = name;
+        playerTag.textContent = `Player: ${playerName}`;
+        sessionReady = true;
+        unlockAudio();
+        gate.classList.add("hide");
+        showToast(`Selamat datang, ${playerName}!`);
+      });
+
+      updateBalanceDisplay();
+      updateJackpotMeter();
+      spinRange.dispatchEvent(new Event("input"));
+    </script>
+  </body>
+</html>
