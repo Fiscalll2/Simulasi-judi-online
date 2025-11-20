@@ -932,19 +932,34 @@
             reelContent.style.transition = "transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94)";
             setTimeout(() => {
               reelContent.style.transform = `translateY(${finalY}%)`;
-              if (callback) {
-                // Delay sedikit sebelum callback untuk efek final
-                setTimeout(callback, 300);
-              }
+              
+              // Double check: pastikan simbol yang terlihat benar sesuai dengan result
+              setTimeout(() => {
+                const symbolDivs = reelContent.querySelectorAll(".reel-symbol");
+                const middleIndex = Math.floor(symbolDivs.length / 2);
+                if (symbolDivs[middleIndex]) {
+                  symbolDivs[middleIndex].textContent = finalSymbol;
+                }
+                // Pastikan neighbors juga benar
+                if (symbolDivs[middleIndex - 1]) {
+                  const prevSymbolIndex = symbols.indexOf(finalSymbol);
+                  symbolDivs[middleIndex - 1].textContent = symbols[(prevSymbolIndex - 1 + symbols.length) % symbols.length];
+                }
+                if (symbolDivs[middleIndex + 1]) {
+                  const nextSymbolIndex = symbols.indexOf(finalSymbol);
+                  symbolDivs[middleIndex + 1].textContent = symbols[(nextSymbolIndex + 1) % symbols.length];
+                }
+                
+                if (callback) {
+                  callback();
+                }
+              }, 100);
             }, 50);
           }
         }
         
-        // Start animation dengan delay berbeda untuk setiap reel (sequential reveal)
-        const delay = index * 400; // Delay semakin lama untuk suspense
-        setTimeout(() => {
-          animate();
-        }, delay);
+        // Start animation BERSAMAAN untuk semua reel (tidak ada delay)
+        animate();
       }
 
       function startRolling() {
@@ -960,27 +975,26 @@
         reels.forEach((reel) => reel.classList.remove("spinning"));
       }
 
-      function revealReelSequentially(result, state, callback) {
-        let revealedCount = 0;
-        const reelCallbacks = [];
+      function revealAllReelsTogether(result, state, callback) {
+        let completedCount = 0;
         
-        // Start semua reel spinning dengan delay berbeda
+        // Start semua reel spinning BERSAMAAN tanpa delay
         reels.forEach((reel, index) => {
           const targetSymbol = result[index];
           reel.classList.add("revealing");
           
-          // Animate reel dengan deceleration
-          animateReelSpinning(reel, index, targetSymbol, () => {
+          // Animate reel dengan deceleration - semua mulai bersamaan
+          animateReelSpinning(reel, 0, targetSymbol, () => {
             // Reel selesai spinning
             reel.classList.remove("spinning");
             
             // Play reveal sound dengan pitch berbeda untuk setiap reel
             playTone(300 + index * 150, 0.25, "sine", 0.12);
             
-            revealedCount++;
+            completedCount++;
             
             // Jika semua reel selesai, call main callback
-            if (revealedCount >= reels.length) {
+            if (completedCount >= reels.length) {
               if (callback) callback();
             }
           });
@@ -991,8 +1005,8 @@
         // Check for near miss (gambler's fallacy)
         checkNearMiss(result);
         
-        // Reveal satu per satu dengan suspense
-        revealReelSequentially(result, state, () => {
+        // Reveal semua reel BERSAMAAN (berhenti barengan)
+        revealAllReelsTogether(result, state, () => {
           // Setelah semua reveal, apply win effects
           requestAnimationFrame(() => {
             reels.forEach((reel) => reel.classList.remove("revealing"));
@@ -1222,7 +1236,7 @@
         setTimeout(() => {
           const comboScore = result.reduce((sum, symbol) => sum + rarityScore[symbol], 0);
           
-          // Update reels dengan reveal sequential (suspense!)
+          // Update reels - semua berputar dan berhenti BERSAMAAN
           updateReels(result, state, () => {
             // Callback setelah semua reel reveal
             let rewardText = "Hangus";
